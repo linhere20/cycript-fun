@@ -1,47 +1,33 @@
 @import com.saurik.substrate.MS;
 
-var util = require("util");
+const util = require("util");
 
-var app = [UIApplication sharedApplication];
-var userDefaults = [NSUserDefaults standardUserDefaults];
+const app = [UIApplication sharedApplication];
+const userDefaults = [NSUserDefaults standardUserDefaults];
 
-util.toHumanString = function(obj){
-	return JSON.stringify(obj, null, 4);
-};
+util.toHumanString = obj => JSON.stringify(obj, null, 4);
 
-UIView.prototype.unhighlight = function(){
-	unhighlight(this);
-};
+UIView.prototype.unhighlight = () => unhighlight(this);
 
-UIView.prototype.highlight = function(){
-	highlight(this);
-};
+UIView.prototype.highlight = () => highlight(this);
 
-UIControl.prototype.findTargetAction = function(){
-	return findTargetAction(this);
-};
+UIControl.prototype.findTargetAction = () => findTargetAction(this);
 
 
-(function(fun){
+(fun => {
 
-	fun.bundle = function(){
-		return [[NSBundle mainBundle] infoDictionary];
-	}
+	fun.bundle = () => [[NSBundle mainBundle] infoDictionary];
 
-	fun.bundleID = function(){
-		return [[NSBundle mainBundle] infoDictionary][@"CFBundleIdentifier"];
-	}
+	fun.bundleId = () => [[NSBundle mainBundle] infoDictionary][@"CFBundleIdentifier"];
 
-	fun.sandBox = function(){
-		return NSHomeDirectory();
-	}
+	fun.sandbox = () => NSHomeDirectory();
 
-	fun.keyWindow = function(){
-		return [app keyWindow] || [app.delegate.window];
-	}
+	fun.keyWindow = () => [app keyWindow] || [app.delegate.window];
 
-	fun.generalPasteboard = function(str){
-		var pasteboard = [UIPasteboard generalPasteboard];
+	fun.openURL = url => [app openURL:[NSURL URLWithString:url]];
+
+	fun.generalPasteboard = str => {
+		let pasteboard = [UIPasteboard generalPasteboard];
 		if(str){
 			pasteboard.string = str.toString();
 		}
@@ -50,27 +36,26 @@ UIControl.prototype.findTargetAction = function(){
 		}
 	}
 
-	fun.groupContainers = function(){
-		var proxy = [LSApplicationProxy applicationProxyForIdentifier:fun.bundleID()]
+	fun.groupContainers = () => { 
+		let proxy = [LSApplicationProxy applicationProxyForIdentifier:fun.bundleId()]
 		return [proxy groupContainers].toString()
 	}
 
-	fun.evalJSWebView = function(webView, js){
+	fun.evalJSWebView = (webView, js) => {
 		if([webView isKindOfClass: [UIWebView class]]){
 			NSLog(@"%@", [webView stringByEvaluatingJavaScriptFromString:js]);
 		}else if([webView isKindOfClass: [WKWebView class]]){
-			var block = ^void(id obj, NSError *error){
+			[webView evaluateJavaScript:js completionHandler: ^void(id obj, NSError *error){
 				NSLog(@"%@", obj);
-			};
-			[webView evaluateJavaScript:js completionHandler: block];
+			}];
 		}
 	}
 
-	fun.printUserDefaults = function(){
-		return [userDefaults dictionaryRepresentation].toString();
-	}
+	fun.printWebViewDocument = webView => fun.evalJSWebView(webView, @"document.documentElement.innerHTML");
 
-	fun.printUI = function(isAutoLayout){
+	fun.printUserDefaults = () => [userDefaults dictionaryRepresentation].toString();
+
+	fun.printUI = isAutoLayout => {
 		if(isAutoLayout){
 			return [[app keyWindow] _autolayoutTrace].toString();	
 		}
@@ -79,35 +64,25 @@ UIControl.prototype.findTargetAction = function(){
 		}
 	}
 
-	fun.printVC = function(){
-		return [[[UIWindow keyWindow] rootViewController] _printHierarchy].toString();
-	}
+	fun.printVC = () => [[[UIWindow keyWindow] rootViewController] _printHierarchy].toString();
 
-	fun.printMethod = function(cls){
-		return [cls _methodDescription].toString();
-	}
+	fun.printMethod = cls => [cls _methodDescription].toString();
 
-	fun.printShortMethod = function(cls){
-		return [cls _shortMethodDescription].toString();
-	}
+	fun.printShortMethod = cls => [cls _shortMethodDescription].toString();
 
-	fun.printVar = function(ins){
-		return [ins _ivarDescription].toString();
-	}
+	fun.printVar = ins => [ins _ivarDescription].toString();
 
-	fun.printModules = function(){
-		var modules = [];
-		for (var i = 0; i < _dyld_image_count(); i++){
+	fun.printModules = () => {
+		let modules = [];
+		let count = _dyld_image_count();	
+		for (let i = 0; i < count; i++){
 			modules[i] = _dyld_get_image_name(i).toString();
 		}
-		return util.toHumanString({
-			"count": _dyld_image_count(),
-			"modules": modules
-		});
+		return util.toHumanString({count, modules});
 	}
 
-	fun.printDeviceInfo = function(){
-		var device = [UIDevice currentDevice];
+	fun.printDeviceInfo = () => {
+		let device = [UIDevice currentDevice];
 		return util.toHumanString({
 			IDFA: [[[ASIdentifierManager sharedManager] advertisingIdentifier] UUIDString],
 			IDFV: [[device identifierForVendor] UUIDString],
@@ -120,23 +95,23 @@ UIControl.prototype.findTargetAction = function(){
 		})
 	}
 
-	fun.findTargetAction = function(ins){
-		var result = [];
-		var targets = [ins allTargets].allObjects();
-		for(var i = 0; i < targets.length; i++){
-			var target = targets[i];
-			var actions = [ins actionsForTarget:target forControlEvent:0];
+	fun.findTargetAction = ins => {
+		let result = [];
+		let targets = [ins allTargets].allObjects();
+		for(let i = 0; i < targets.length; i++){
+			let target = targets[i];
+			let actions = [ins actionsForTarget:target forControlEvent:0];
 			result.push({
-				"target": target,
-				"actions": actions
+				target: target,
+				actions: actions
 			});
 		}
 
 		return util.toHumanString(result);
 	}
 
-	fun.findCurrentViewController = function(){
-		var vc = app.keyWindow.rootViewController;
+	fun.findCurrentViewController = () => {
+		let vc = app.keyWindow.rootViewController;
 		while(true){
 			if ([vc isKindOfClass:[UITabBarController class]]) {
             	vc = vc.selectedViewController;
@@ -153,10 +128,10 @@ UIControl.prototype.findTargetAction = function(){
 		return vc;
 	}
 
-	fun.findSubViews = function(cls, parent){
-		var views = [];
-		function _innerFindSubViews(par){
-			[par subviews].map(function(value){
+	fun.findSubViews = (cls, parent) => {
+		let views = [];
+		let _innerFindSubViews = par => {
+			[par subviews].map(value => {
 				if([value isKindOfClass: cls]){
 					views.push(value);
 				}
@@ -167,31 +142,31 @@ UIControl.prototype.findTargetAction = function(){
 		return util.toHumanString(views);
 	}
 
-	fun.alert = function(msg){
-		var alert = [[UIAlertView alloc] initWithTitle:"cycript" message:msg.toString() delegate:nil cancelButtonTitle:"OK" otherButtonTitles:nil];
+	fun.alert = msg => {
+		let alert = [[UIAlertView alloc] initWithTitle:"cycript" message:msg.toString() delegate:nil cancelButtonTitle:"OK" otherButtonTitles:nil];
         [alert show];
         return alert;
 	}
 
-	fun.unhighlight = function(view){
-		var tag = 99999;
+	fun.unhighlight = view => {
+		let tag = 99999;
     	[[view viewWithTag:tag] removeFromSuperview];
     	[view setNeedsDisplay];
 	}
 
-	fun.highlight = function(view){
+	fun.highlight = view => {
 		if(![view isKindOfClass: [UIView class]]){
             return;
 		}
-	    var tag = 99999;
+	    let tag = 99999;
 	    fun.unhighlight(view);
 
-	    var bounds = view.bounds;
-	    var rect = new CGRect
+	    let bounds = view.bounds;
+	    let rect = new CGRect
 	    rect->origin = bounds[0];
 	    rect->size = bounds[1];
 
-	    var highlight = [[UIView alloc] initWithFrame:*rect];
+	    let highlight = [[UIView alloc] initWithFrame:*rect];
 	    highlight.backgroundColor = [UIColor clearColor];
 	    highlight.layer.borderWidth = 3;
 	    highlight.layer.borderColor = [[UIColor colorWithRed:0.37 green:0.76 blue:1.00 alpha:1.00] CGColor];
@@ -201,55 +176,53 @@ UIControl.prototype.findTargetAction = function(){
 	    [view setNeedsDisplay];
 	}
 
-	fun.inputText = function(text){
-		var keyboard = [UIKeyboardImpl activeInstance];
+	fun.inputText = text => {
+		let keyboard = [UIKeyboardImpl activeInstance];
 		[keyboard insertText:text];
 	}
 
-	fun.deleteBackward = function(times){
-		var keyboard = [UIKeyboardImpl activeInstance];
+	fun.deleteBackward = times => {
+		let keyboard = [UIKeyboardImpl activeInstance];
 		while(--times >= 0){
      		[keyboard deleteBackward];
     	}
 	}
 
-	fun.loadFramework = function(framework){
-		var frameworkPath = "/System/Library/Frameworks/" + framework + ".framework";
-		var privateFrameworkPath = "/System/Library/PrivateFrameworks/" + framework + ".framework";
-		var bundle = [NSBundle bundleWithPath: frameworkPath] || [NSBundle bundleWithPath: privateFrameworkPath]; 
+	fun.loadFramework = framework => {
+		let frameworkPath = "/System/Library/Frameworks/" + framework + ".framework";
+		let privateFrameworkPath = "/System/Library/PrivateFrameworks/" + framework + ".framework";
+		let bundle = [NSBundle bundleWithPath: frameworkPath] || [NSBundle bundleWithPath: privateFrameworkPath]; 
 		return [bundle load];
 	}
 
-	fun.sysctlbyname = function(key){
-		var sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
-		var sysctlbyname = (typedef int(char*, void*, size_t*, void*, size_t))(sysctlbyname);
+	fun.sysctlbyname = key => {
+		let sysctlbyname = dlsym(RTLD_DEFAULT, "sysctlbyname");
+		sysctlbyname = (typedef int(char*, void*, size_t*, void*, size_t))(sysctlbyname);
 		
-		var size = new int;
+		let size = new int;
     	sysctlbyname(key, NULL, size, NULL, 0);
-    	var p = malloc(*size);
-    	var machine = (typedef signed char (*)[*size])(p);
+    	let p = malloc(*size);
+    	let machine = (typedef signed char (*)[*size])(p);
     	sysctlbyname(key, machine, size, NULL, 0);
     	return [NSString stringWithFormat:@"%s", machine];
 	}
 
-	fun.registerURLProtocol = function(){
-		[NSURLProtocol registerClass:[IFunURLProtocol class]];
-	}
+	fun.registerURLProtocol = () => [NSURLProtocol registerClass:[IFunURLProtocol class]];
 
-	fun.classdump = function(){
-		var bundlePath = NSBundle.mainBundle().executablePath;
+	fun.killSSL = () => {};
+
+	fun.classdump = () => {
+		let bundlePath = NSBundle.mainBundle().executablePath;
 		NSLog(@"bundle path: %@", bundlePath);
-		for (var i = 0; i < _dyld_image_count(); i++){
+		for (let i = 0; i < _dyld_image_count(); i++){
 			modules[i] = _dyld_get_image_name(i).toString();
 		}
-	}
+	};
 
-	fun.killSSL = function(){
-	}
 
-	for(var k in fun) {
+	for(let k in fun) {
 		if(fun.hasOwnProperty(k)) {
-			var f = fun[k];
+			let f = fun[k];
 			if(typeof f === 'function') {
 				Cycript.all[k] = f;
 			}
