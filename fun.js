@@ -13,16 +13,33 @@ UIView.prototype.highlight = () => highlight(this);
 
 UIControl.prototype.findTargetAction = () => findTargetAction(this);
 
+Array.prototype.contains = needle => {
+	for (i in this) {
+		if (this[i] == needle){ 
+			return true;
+		}
+	}
+	return false;
+}
+
 
 (fun => {
+	let shouldExportRoot = true;
+
+	fun.cons = {
+	};
+
+	fun.ilog = x => NSLog(@"%@", x);
 
 	fun.bundle = () => [[NSBundle mainBundle] infoDictionary];
 
-	fun.bundleId = () => [[NSBundle mainBundle] infoDictionary][@"CFBundleIdentifier"];
+	fun.bundleId = () => fun.bundle()[@"CFBundleIdentifier"];
 
 	fun.sandbox = () => NSHomeDirectory();
 
 	fun.keyWindow = () => [app keyWindow] || [app.delegate.window];
+
+	fun.urlTypes = () => fun.bundle()["CFBundleURLTypes"].toString();
 
 	fun.openURL = url => [app openURL:[NSURL URLWithString:url]];
 
@@ -38,7 +55,7 @@ UIControl.prototype.findTargetAction = () => findTargetAction(this);
 
 	fun.groupContainers = () => { 
 		let proxy = [LSApplicationProxy applicationProxyForIdentifier:fun.bundleId()]
-		return [proxy groupContainers].toString()
+		return [proxy groupContainerURLs].toString()
 	}
 
 	fun.evalJSWebView = (webView, js) => {
@@ -53,14 +70,16 @@ UIControl.prototype.findTargetAction = () => findTargetAction(this);
 
 	fun.printWebViewDocument = webView => fun.evalJSWebView(webView, @"document.documentElement.innerHTML");
 
+	fun.printMainBundleInfo = () => fun.bundle().toString();
+
 	fun.printUserDefaults = () => [userDefaults dictionaryRepresentation].toString();
 
 	fun.printUI = isAutoLayout => {
 		if(isAutoLayout){
-			return [[app keyWindow] _autolayoutTrace].toString();	
+			return [fun.keyWindow() _autolayoutTrace].toString();	
 		}
 		else{
-			return [[app keyWindow] recursiveDescription].toString();
+			return [fun.keyWindow() recursiveDescription].toString();
 		}
 	}
 
@@ -207,6 +226,61 @@ UIControl.prototype.findTargetAction = () => findTargetAction(this);
     	return [NSString stringWithFormat:@"%s", machine];
 	}
 
+	/*
+		1.logs an instance method: logify(UIView, @selector(setSize:))
+		2.logs an class method: logify(object_getClass(UIView), @selector(load))
+	*/
+	fun.logify = (cls, sel) => {
+		let skipMethods = [
+			".cxx_destruct",
+			"dealloc"
+		]
+
+		let selName = sel_getName(sel)
+		if(skipMethods.contains(selName)){
+			return;	
+		}
+
+		let selFormat = selName.replace(/:/g, ":%s ").trim();
+		let logFormat = @"%s[<%@: %p> " + selFormat + "] === %s";
+		let oldm = {};
+		MS.hookMessage(cls, sel, function() {
+			let args = [logFormat, class_isMetaClass(cls)? "+": "-", cls, (typedef void *)(this)];
+			for (let arg of arguments) {
+				args.push(arg.toString());
+			}
+
+			let r = oldm->apply(this, arguments);
+			args.push(r? r.toString(): null);
+
+			NSLog.apply(null, args);
+
+			return r;
+		}, oldm);
+
+		NSLog(@"cycript logify: %s[%s %s]", class_isMetaClass(cls)? "+" : "-", class_getName(cls), sel_getName(sel));
+		return oldm;
+	}
+
+	/*
+		logifyAll(UIView)
+	*/
+	fun.logifyAll = cls => {
+		let clsCount = new int;
+		let clsMethods = class_copyMethodList(object_getClass(cls), clsCount);
+		for(let i = 0; i < *clsCount; i++){
+			let sel = method_getName(clsMethods[i]);
+			fun.logify(object_getClass(cls), sel);
+		}
+
+		let insCount = new int;
+		let insMethods = class_copyMethodList(cls, insCount);
+		for(let i = 0; i < *insCount; i++){
+			let sel = method_getName(insMethods[i]);
+			fun.logify(cls, sel);
+		}
+	}
+
 	fun.registerURLProtocol = () => [NSURLProtocol registerClass:[IFunURLProtocol class]];
 
 	fun.killSSL = () => {};
@@ -220,14 +294,20 @@ UIControl.prototype.findTargetAction = () => findTargetAction(this);
 	};
 
 
-	for(let k in fun) {
-		if(fun.hasOwnProperty(k)) {
-			let f = fun[k];
-			if(typeof f === 'function') {
-				Cycript.all[k] = f;
+	if(shouldExportRoot){
+		for(let k in fun) {
+			if(fun.hasOwnProperty(k)) {
+				let f = fun[k];
+				// if(typeof f === 'function') {
+					Cycript.all[k] = f;
+				// }
 			}
-		}
+		}	
 	}
+	else{
+		Cycript.all["fun"] = fun;
+	}
+
 })({});
 
 

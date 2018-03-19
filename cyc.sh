@@ -1,1 +1,1 @@
-cycript -p $1 fun.js ; cycript -p $1
+cycript -p $1 /fun.js ; cycript -p $1
