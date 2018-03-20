@@ -7,20 +7,11 @@ const userDefaults = [NSUserDefaults standardUserDefaults];
 
 util.toHumanString = obj => JSON.stringify(obj, null, 4);
 
-UIView.prototype.unhighlight = () => unhighlight(this);
+UIView.prototype.unhighlight = () => fun.unhighlight(this);
 
-UIView.prototype.highlight = () => highlight(this);
+UIView.prototype.highlight = () => fun.highlight(this);
 
-UIControl.prototype.findTargetAction = () => findTargetAction(this);
-
-Array.prototype.contains = needle => {
-	for (i in this) {
-		if (this[i] == needle){ 
-			return true;
-		}
-	}
-	return false;
-}
+UIControl.prototype.findTargetAction = () => fun.findTargetAction(this);
 
 
 (fun => {
@@ -132,17 +123,17 @@ Array.prototype.contains = needle => {
 	fun.findCurrentViewController = () => {
 		let vc = app.keyWindow.rootViewController;
 		while(true){
-			if ([vc isKindOfClass:[UITabBarController class]]) {
-            	vc = vc.selectedViewController;
-        	}
-        	if ([vc isKindOfClass:[UINavigationController class]]) {
-            	vc = vc.visibleViewController;
-        	}
-        	if (vc.presentedViewController) {
-            	vc = vc.presentedViewController;
-        	}else{
-            	break;
-        	}
+			if([vc isKindOfClass:[UITabBarController class]]) {
+	        	vc = vc.selectedViewController;
+	    	}
+	    	if([vc isKindOfClass:[UINavigationController class]]) {
+	        	vc = vc.visibleViewController;
+	    	}
+	    	if(vc.presentedViewController) {
+	        	vc = vc.presentedViewController;
+	    	}else{
+	        	break;
+	    	}
 		}
 		return vc;
 	}
@@ -237,8 +228,8 @@ Array.prototype.contains = needle => {
 		]
 
 		let selName = sel_getName(sel)
-		if(skipMethods.contains(selName)){
-			return;	
+		if(skipMethods.lastIndexOf(selName.toString()) !== -1){
+			return;
 		}
 
 		let selFormat = selName.replace(/:/g, ":%s ").trim();
@@ -272,6 +263,7 @@ Array.prototype.contains = needle => {
 			let sel = method_getName(clsMethods[i]);
 			fun.logify(object_getClass(cls), sel);
 		}
+		free(clsMethods);
 
 		let insCount = new int;
 		let insMethods = class_copyMethodList(cls, insCount);
@@ -279,9 +271,29 @@ Array.prototype.contains = needle => {
 			let sel = method_getName(insMethods[i]);
 			fun.logify(cls, sel);
 		}
+		free(insMethods);
 	}
 
-	fun.registerURLProtocol = () => [NSURLProtocol registerClass:[IFunURLProtocol class]];
+	fun.registerURLProtocol = () => {
+		fun.loadURLProtocol = () => {
+			@implementation IFunURLProtocol : NSURLProtocol {
+			}
+			+ (BOOL)canInitWithRequest:(NSURLRequest *)request {
+		    	NSLog(@"Req: %@ %@, Headers: %@", request.HTTPMethod, request.URL, request.allHTTPHeaderFields);
+		    	return NO;
+		  	}
+		  	@end
+		}
+
+		try {
+    		[IFunURLProtocol class];
+  		} catch (e) {
+    		fun.loadURLProtocol();
+  		}
+
+		[NSURLProtocol registerClass:[IFunURLProtocol class]];	
+		NSLog(@"Injected custom NSURLProtocol");
+	}
 
 	fun.killSSL = () => {};
 
@@ -294,6 +306,7 @@ Array.prototype.contains = needle => {
 	};
 
 
+	Cycript.all["fun"] = fun;
 	if(shouldExportRoot){
 		for(let k in fun) {
 			if(fun.hasOwnProperty(k)) {
@@ -304,21 +317,8 @@ Array.prototype.contains = needle => {
 			}
 		}	
 	}
-	else{
-		Cycript.all["fun"] = fun;
-	}
 
 })({});
 
-
-/*
-@implementation IFunURLProtocol : NSURLProtocol{
-}
-+ (BOOL)canInitWithRequest:(NSURLRequest *)request {
-    NSLog("HttpRequest: " + request.HTTPMethod + ", url: " + request.URL + ", headers: " + request.allHTTPHeaderFields);
-    return NO;
-}
-@end
-*/
 
 
