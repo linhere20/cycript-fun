@@ -34,6 +34,8 @@ UIControl.prototype.findTargetAction = () => fun.findTargetAction(this);
 
 	fun.openURL = url => [app openURL:[NSURL URLWithString:url]];
 
+	fun.snapshot = () => [[SBScreenShotter sharedInstance] saveScreenshot:YES];
+
 	fun.generalPasteboard = str => {
 		let pasteboard = [UIPasteboard generalPasteboard];
 		if(str){
@@ -293,6 +295,16 @@ UIControl.prototype.findTargetAction = () => fun.findTargetAction(this);
 
 		[NSURLProtocol registerClass:[IFunURLProtocol class]];	
 		NSLog(@"Injected custom NSURLProtocol");
+	}
+
+	fun.callStackHook = (cls, sel) => {
+		let oldm = {};
+		MS.hookMessage(cls, sel, function() {
+			NSLog(@"%s[%s %s]: %@", class_isMetaClass(cls)? "+" : "-", class_getName(cls), sel_getName(sel), [NSThread callStackSymbols])
+			let r = oldm->apply(this, arguments);
+			return r;
+		}, oldm);
+		return oldm;
 	}
 
 	fun.killSSL = () => {};
