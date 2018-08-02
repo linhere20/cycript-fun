@@ -7,13 +7,6 @@ const userDefaults = [NSUserDefaults standardUserDefaults];
 
 util.toHumanString = obj => JSON.stringify(obj, null, 4);
 
-UIView.prototype.unhighlight = () => fun.unhighlight(this);
-
-UIView.prototype.highlight = () => fun.highlight(this);
-
-UIControl.prototype.findTargetAction = () => fun.findTargetAction(this);
-
-
 (fun => {
 	let shouldExportRoot = true;
 
@@ -122,23 +115,29 @@ UIControl.prototype.findTargetAction = () => fun.findTargetAction(this);
 		return util.toHumanString(result);
 	}
 
-	fun.findCurrentViewController = () => {
-		let vc = app.keyWindow.rootViewController;
-		while(true){
-			if([vc isKindOfClass:[UITabBarController class]]) {
-	        	vc = vc.selectedViewController;
-	    	}
-	    	if([vc isKindOfClass:[UINavigationController class]]) {
-	        	vc = vc.visibleViewController;
-	    	}
-	    	if(vc.presentedViewController) {
-	        	vc = vc.presentedViewController;
-	    	}else{
-	        	break;
-	    	}
-		}
-		return vc;
-	}
+	fun._findCurrentViewController = function(vc) {
+		if (vc.presentedViewController) {
+        	return fun._findCurrentViewController(vc.presentedViewController);
+	    }else if ([vc isKindOfClass:[UITabBarController class]]) {
+	        return fun._findCurrentViewController(vc.selectedViewController);
+	    } else if ([vc isKindOfClass:[UINavigationController class]]) {
+	        return fun._findCurrentViewController(vc.visibleViewController);
+	    } else {
+	    	var count = vc.childViewControllers.count;
+    		for (var i = count - 1; i >= 0; i--) {
+    			var childVc = vc.childViewControllers[i];
+    			if (childVc && childVc.view.window) {
+    				vc = fun._findCurrentViewController(childVc);
+    				break;
+    			}
+    		}
+	        return vc;
+    	}
+	};
+
+	fun.findCurrentViewController = function() {
+		return fun._findCurrentViewController(UIApp.keyWindow.rootViewController);
+	};
 
 	fun.findSubViews = (cls, parent) => {
 		let views = [];
@@ -307,16 +306,15 @@ UIControl.prototype.findTargetAction = () => fun.findTargetAction(this);
 		return oldm;
 	}
 
+	fun.CGPointMake = (x, y) => [x, y];
+
+	fun.CGSizeMake = (w, h) => [w, h];
+
+	fun.CGRectMake = (x, y, w, h) => [[x, y], [w, h]];
+
+	fun.buttonTap = btn => [btn sendActionsForControlEvents:UIControlEventTouchUpInside];
+
 	fun.killSSL = () => {};
-
-	fun.classdump = () => {
-		let bundlePath = NSBundle.mainBundle().executablePath;
-		NSLog(@"bundle path: %@", bundlePath);
-		for (let i = 0; i < _dyld_image_count(); i++){
-			modules[i] = _dyld_get_image_name(i).toString();
-		}
-	};
-
 
 	Cycript.all["fun"] = fun;
 	if(shouldExportRoot){
