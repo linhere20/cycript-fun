@@ -218,6 +218,21 @@ util.toHumanString = obj => JSON.stringify(obj, null, 4);
     	return [NSString stringWithFormat:@"%s", machine];
 	}
 
+	fun.MGCopyAnswer = key => {
+		const gestalt = dlopen("/usr/lib/libMobileGestalt.dylib", RTLD_GLOBAL | RTLD_LAZY);
+		let mgcopy = dlsym(gestalt, "MGCopyAnswer");
+		mgcopy = (typedef char*(char*))(mgcopy);
+		return [NSString stringWithFormat:@"%s", mgcopy(key)];
+	}
+
+	fun.saveImageJPEG = (uiImage, path) => {
+		return [UIImageJPEGRepresentation(uiImage, 1.0) writeToFile:path atomically:NO];  
+	}
+
+	fun.saveImagePNG = (uiImage, path) => {
+		return [UIImagePNGRepresentation(uiImage) writeToFile:path atomically:NO];  
+	}
+
 	/*
 		1.logs an instance method: logify(UIView, @selector(setSize:))
 		2.logs an class method: logify(object_getClass(UIView), @selector(load))
